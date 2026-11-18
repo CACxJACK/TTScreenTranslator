@@ -1,0 +1,59 @@
+
+name: Gerar APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.zip'
+      - '.github/workflows/main.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar arquivos
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extrair projeto
+        run: |
+          ZIP=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "Arquivo ZIP não encontrado"
+            exit 1
+          fi
+
+          mkdir extracted
+          unzip -q "$ZIP" -d extracted
+
+          SETTINGS=$(find extracted -name 'settings.gradle.kts' -type f | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle.kts não encontrado no ZIP"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          cp -a "$PROJECT_DIR"/. .
+
+      - name: Compilar APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TTScreenTranslator-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          
